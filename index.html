@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>스마트 시설물 일일 점검표</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Noto Sans KR Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif;
+            -webkit-tap-highlight-color: transparent;
+            word-break: keep-all;
+        }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+
+        @media print {
+            body * { visibility: hidden; }
+            #monthlyReportModal, #monthlyReportModal * { visibility: visible; }
+            #monthlyReportModal {
+                position: absolute; left: 0; top: 0; width: 100%; height: auto;
+                background: white !important; backdrop-filter: none !important; padding: 0 !important;
+            }
+            .no-print { display: none !important; }
+            .print-area { max-height: none !important; overflow: visible !important; border: none !important; box-shadow: none !important; }
+            table { width: 100% !important; border-collapse: collapse !important; }
+            th, td { border: 1px solid #cbd5e1 !important; padding: 6px 8px !important; font-size: 11px !important; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 min-h-screen pb-24">
+
+    <!-- Mobile App Style Header -->
+    <header class="sticky top-0 z-30 bg-slate-900 text-white shadow-md">
+        <div class="px-4 py-3.5 flex items-center justify-between">
+            <div class="flex items-center space-x-2.5">
+                <div class="w-9 h-9 rounded-xl bg-blue-600 flex items-center justify-center text-white shadow-inner">
+                    <i class="fa-solid fa-clipboard-check text-lg"></i>
+                </div>
+                <div>
+                    <h1 class="font-bold text-sm leading-tight" id="headerTitle">스마트 시설물 일일 점검표</h1>
+                    <p class="text-[11px] text-blue-400 font-medium">모바일 현장 점검 시스템</p>
+                </div>
+            </div>
+            <div class="flex items-center space-x-1.5">
+                <button id="monthlyReportModalBtn" class="bg-indigo-600/80 hover:bg-indigo-600 text-white text-[11px] px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1">
+                    <i class="fa-solid fa-calendar-days"></i>
+                    <span>모니터링</span>
+                </button>
+                <button id="adminSignatureModalBtn" class="bg-emerald-600/80 hover:bg-emerald-600 text-white text-[11px] px-2.5 py-1.5 rounded-lg font-medium transition flex items-center gap-1">
+                    <i class="fa-solid fa-signature"></i>
+                    <span>결재</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-xl mx-auto p-3 sm:p-4 space-y-3.5">
+
+        <!-- Google Sheet Link Status Bar -->
+        <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-3.5 py-2.5 flex items-center justify-between text-xs">
+            <div class="flex items-center space-x-2 text-emerald-900 truncate">
+                <i class="fa-solid fa-database text-emerald-600 flex-shrink-0"></i>
+                <span class="truncate font-medium">구글시트 연동 완료</span>
+            </div>
+            <a href="https://docs.google.com/spreadsheets/d/1zYOxzaZiDkztnMUsLfJXU1uZMvo5K72ZWuM9_ba8IVQ/edit?usp=drive_link" target="_blank" class="text-blue-600 font-bold hover:underline flex-shrink-0 ml-2">시트열기 <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i></a>
+        </div>
+
+        <!-- Inspection Type & Meta Form (Card Style) -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-3">
+            <div>
+                <label class="block text-xs font-bold text-slate-600 mb-1.5">
+                    <i class="fa-solid fa-list-check mr-1 text-blue-600"></i> 점검일지 종류 선택
+                </label>
+                <select id="logTypeSelect" class="w-full bg-slate-50 border border-slate-300 text-slate-900 font-bold text-sm rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                    <option value="central">🖥️ 자동제어 중앙감시반 일일 점검표</option>
+                    <option value="ro">💧 RO실 일일점검 일지</option>
+                    <option value="solar">☀️ 신재생에너지 (태양열) 일일 점검일지</option>
+                </select>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2.5 pt-1 border-t border-slate-100">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">점검일자</label>
+                    <input type="date" id="logDate" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs font-semibold rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-500 mb-1">점검자 성명</label>
+                    <input type="text" id="inspectorName" placeholder="성명을 입력하세요" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs font-medium rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+            </div>
+
+            <!-- Real-time Status Badge -->
+            <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px]">
+                <span class="text-slate-500 flex items-center gap-1.5">
+                    <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                    <span id="autoSaveText">입력 실시간 자동 저장 중</span>
+                </span>
+                <span id="approvalStatusTag" class="px-2 py-0.5 rounded font-semibold bg-slate-100 text-slate-600">결재 미완료</span>
+            </div>
+        </div>
+
+        <!-- Quick Batch Buttons -->
+        <div class="bg-gradient-to-r from-blue-900 to-slate-900 rounded-2xl p-3.5 text-white shadow-md flex items-center justify-between">
+            <div>
+                <h2 class="font-bold text-xs text-blue-200">일괄 점검 체크</h2>
+                <p class="text-[11px] text-slate-300">특이사항이 없다면 전체 양호 처리</p>
+            </div>
+            <div class="flex space-x-1.5">
+                <button id="batchPassBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-[11px] font-bold px-3 py-2 rounded-xl shadow transition">
+                    <i class="fa-solid fa-circle-check"></i> 전체 양호
+                </button>
+                <button id="batchResetBtn" class="bg-slate-700 hover:bg-slate-600 text-slate-200 text-[11px] font-semibold px-2.5 py-2 rounded-xl transition">
+                    초기화
+                </button>
+            </div>
+        </div>
+
+        <!-- Checklist Survey Container -->
+        <div id="checklistContainer" class="space-y-3.5"></div>
+
+        <!-- Memo Section -->
+        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 space-y-2">
+            <label class="block text-xs font-bold text-slate-700">
+                <i class="fa-solid fa-pen-to-square mr-1 text-blue-600"></i> 특이사항 및 현장 조치내용
+            </label>
+            <textarea id="generalMemo" rows="3" placeholder="특이사항이나 이상 조치 내용을 입력하세요..." class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none"></textarea>
+        </div>
+
+        <!-- Final Submit Button -->
+        <div class="pt-2">
+            <button id="saveCompleteBtn" class="w-full bg-blue-600 hover:bg-blue-700 active:bg-blue-800 text-white font-bold py-4 px-4 rounded-2xl shadow-lg transition flex items-center justify-center space-x-2 text-sm sm:text-base">
+                <i class="fa-solid fa-cloud-arrow-up text-lg"></i>
+                <span>점검표 제출 및 구글시트 저장</span>
+            </button>
+        </div>
+    </main>
+
+    <!-- Manager Monthly & Daily Monitoring Modal -->
+    <div id="monthlyReportModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="bg-white w-full max-w-2xl rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh] print-area">
+            <div class="bg-indigo-950 text-white px-4 py-3 flex items-center justify-between no-print">
+                <div class="flex items-center space-x-2">
+                    <i class="fa-solid fa-chart-line text-indigo-400"></i>
+                    <h3 class="font-bold text-sm">일자별 모니터링 및 엑셀 출력</h3>
+                </div>
+                <div class="flex items-center gap-1.5">
+                    <button id="exportExcelBtn" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-file-excel"></i> 엑셀 저장
+                    </button>
+                    <button id="printMonthlyReportBtn" class="bg-blue-600 hover:bg-blue-500 text-white text-xs px-2.5 py-1 rounded-lg font-bold flex items-center gap-1">
+                        <i class="fa-solid fa-print"></i> 인쇄
+                    </button>
+                    <button id="closeMonthlyReportBtn" class="text-slate-400 hover:text-white p-1 text-lg">
+                        <i class="fa-solid fa-xmark"></i>
+                    </button>
+                </div>
+            </div>
+            
+            <div class="p-4 space-y-3 overflow-y-auto flex-1">
+                <div class="flex flex-wrap items-center justify-between bg-slate-50 p-2.5 rounded-xl border border-slate-200 gap-2 no-print">
+                    <div class="flex items-center space-x-2">
+                        <label class="text-xs font-bold text-slate-700">조회 월:</label>
+                        <input type="month" id="monthlyFilterMonth" class="bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <label class="text-xs font-bold text-slate-700">특정일자 선택:</label>
+                        <input type="date" id="dailyFilterDate" class="bg-white border border-slate-300 rounded-lg p-1.5 text-xs font-bold text-slate-800">
+                        <button id="resetDateFilterBtn" class="text-[11px] bg-slate-200 hover:bg-slate-300 px-2 py-1 rounded font-semibold text-slate-700">전체보기</button>
+                    </div>
+                </div>
+
+                <div class="text-center py-2 hidden print:block">
+                    <h2 class="text-xl font-bold text-slate-900" id="printReportTitle">시설물 일자별 점검 현황보고서</h2>
+                </div>
+
+                <div class="overflow-x-auto border border-slate-200 rounded-xl">
+                    <table class="w-full text-xs text-left text-slate-600">
+                        <thead class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                            <tr>
+                                <th class="p-2.5">점검일자</th>
+                                <th class="p-2.5">점검종류</th>
+                                <th class="p-2.5">점검자</th>
+                                <th class="p-2.5 text-center">작성상태</th>
+                                <th class="p-2.5 text-center">결재상태</th>
+                                <th class="p-2.5 text-center no-print">상세보기</th>
+                            </tr>
+                        </thead>
+                        <tbody id="monthlyTableBody" class="divide-y divide-slate-200 bg-white"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="bg-slate-50 p-3 border-t border-slate-200 flex justify-between items-center no-print">
+                <button id="openChangePwdModalBtn" class="text-xs text-indigo-600 font-bold hover:underline flex items-center gap-1">
+                    <i class="fa-solid fa-key"></i> 비밀번호 변경
+                </button>
+                <button id="closeMonthlyReportFooter" class="bg-slate-700 text-white text-xs px-4 py-2 rounded-xl font-bold">닫기</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 비밀번호 확인 모달 -->
+    <div id="adminAuthModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="bg-white w-full max-w-xs rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+                <h3 class="font-bold text-sm"><i class="fa-solid fa-lock mr-1 text-amber-400"></i> 관리자 인증</h3>
+                <button id="closeAuthModalBtn" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <p class="text-xs text-slate-600">결재 권한을 위해 관리자 비밀번호를 입력하세요.</p>
+                <input type="password" id="adminPasswordInput" placeholder="비밀번호 입력" maxlength="20" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-sm font-bold rounded-xl p-3 focus:ring-2 focus:ring-blue-500 focus:outline-none text-center tracking-widest">
+            </div>
+            <div class="bg-slate-50 p-3 border-t flex justify-between items-center">
+                <button id="authToChangePwdBtn" class="text-[11px] text-slate-500 hover:text-blue-600 underline">비밀번호 변경</button>
+                <div class="flex gap-2">
+                    <button id="cancelAuthBtn" class="bg-slate-200 text-slate-700 text-xs px-3 py-2 rounded-xl font-medium">취소</button>
+                    <button id="confirmAuthBtn" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl font-bold">확인</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 관리자 비밀번호 변경 모달 -->
+    <div id="changePwdModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="bg-white w-full max-w-xs rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+                <h3 class="font-bold text-sm"><i class="fa-solid fa-key mr-1 text-amber-400"></i> 비밀번호 변경</h3>
+                <button id="closeChangePwdModalBtn" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-4 space-y-3">
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">현재 비밀번호</label>
+                    <input type="password" id="currentPwdInput" placeholder="현재 비밀번호 입력" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">새 비밀번호</label>
+                    <input type="password" id="newPwdInput" placeholder="새 비밀번호 입력" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-600 mb-1">새 비밀번호 확인</label>
+                    <input type="password" id="newPwdConfirmInput" placeholder="새 비밀번호 재입력" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                </div>
+            </div>
+            <div class="bg-slate-50 p-3 border-t flex justify-end gap-2">
+                <button id="cancelChangePwdBtn" class="bg-slate-200 text-slate-700 text-xs px-3 py-2 rounded-xl font-medium">취소</button>
+                <button id="saveNewPwdBtn" class="bg-blue-600 text-white text-xs px-4 py-2 rounded-xl font-bold">변경 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Manager Signature Modal -->
+    <div id="signatureModal" class="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm hidden flex items-center justify-center p-3">
+        <div class="bg-white w-full max-w-sm rounded-2xl shadow-2xl overflow-hidden flex flex-col">
+            <div class="bg-slate-900 text-white px-4 py-3 flex items-center justify-between">
+                <h3 class="font-bold text-sm">관리자 서명 결재</h3>
+                <button id="closeSigModalBtn" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="p-3.5 space-y-3">
+                <p class="text-[11px] text-slate-600 bg-slate-50 p-2 rounded-xl border" id="sigModalDateTitle">서명을 입력하세요.</p>
+                <div class="border-2 border-dashed border-slate-300 rounded-xl bg-slate-50 overflow-hidden relative">
+                    <canvas id="signatureCanvas" class="w-full h-32 touch-none cursor-crosshair"></canvas>
+                </div>
+                <div>
+                    <label class="block text-[11px] font-semibold text-slate-700 mb-1">관리자 성명</label>
+                    <input type="text" id="adminNameInput" value="관리자" class="w-full bg-slate-50 border border-slate-300 text-slate-800 text-xs rounded-xl p-2">
+                </div>
+            </div>
+            <div class="bg-slate-50 p-3 border-t flex justify-end gap-2">
+                <button id="cancelSigBtn" class="bg-slate-200 text-slate-700 text-xs px-3 py-2 rounded-xl font-medium">취소</button>
+                <button id="saveSignatureBtn" class="bg-emerald-600 text-white text-xs px-4 py-2 rounded-xl font-bold">결재 저장</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notification -->
+    <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-full shadow-xl flex items-center space-x-2 transition-all duration-300 opacity-0 pointer-events-none translate-y-4">
+        <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400"></i>
+        <span id="toastMessage">저장되었습니다.</span>
+    </div>
+
+    <script>
+        // 새로 제공해주신 구글 앱스 스크립트 배포 URL 반영
+        const APPS_SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbz9tjnP7JLfdvaOGqrUq1hFQSraPT6bm1N1gcL3TscEunNI7nfmgx2hpEdGQGKm0FVu/exec'; 
+
+        function getAdminPassword() {
+            return localStorage.getItem('facility_admin_pwd') || '1234';
+        }
+        function setAdminPassword(newPwd) {
+            localStorage.setItem('facility_admin_pwd', newPwd);
+        }
+
+        const logDataTemplates = {
+            central: {
+                title: "자동제어 중앙감시반 일일 점검표",
+                categories: [
+                    {
+                        id: 'cat_device', title: '1. 장비 (제어 / 기동정지)', icon: 'fa-gears text-blue-500',
+                        items: [
+                            { id: 'item_1_1', sub: '펌프류', name: '브라인, 냉난방 순환, 급수가압, 급탕' },
+                            { id: 'item_1_2', sub: '송풍기', name: '기계실, 펌프실, 주차장, 전기실, 정화조 등' },
+                            { id: 'item_1_3', sub: '장비류', name: '빙축열, 냉동기, 보일러, 펌프, 급배기팬 등' },
+                            { id: 'item_1_4', sub: '장비류', name: '급탕순간가열기, 팬코일, 크린룸, 패키지에어콘' },
+                            { id: 'item_1_5', sub: '장비류', name: '주차장팬, 전등, 전열, 외곽등' }
+                        ]
+                    },
+                    {
+                        id: 'cat_meter', title: '2. 계측기 (모니터 화면감시)', icon: 'fa-chart-line text-emerald-500',
+                        items: [
+                            { id: 'item_2_1', sub: '온도확인', name: '보일러 열교환기 공급 및 환수온도 확인' },
+                            { id: 'item_2_2', sub: '온도확인', name: '냉동기 공급 및 환수온도 확인' },
+                            { id: 'item_2_3', sub: '압력확인', name: '헤더공급압력 확인' },
+                            { id: 'item_2_4', sub: '온도확인', name: '급탕(저,고층) 열교환기 공급/환수온도 확인' },
+                            { id: 'item_2_5', sub: '공조기', name: 'AHU 급기온도, 실내온도, 습도, 필터 차압 확인' },
+                            { id: 'item_2_6', sub: '누수감지', name: '항온항습기(BF1, 3F, 4F), 누수감지기' },
+                            { id: 'item_2_7', sub: '외기확인', name: '외기온도 및 습도확인' }
+                        ]
+                    },
+                    {
+                        id: 'cat_alarm', title: '3. 경고 (수위/압력/고장/매연)', icon: 'fa-triangle-exclamation text-amber-500',
+                        items: [
+                            { id: 'item_3_1', sub: '고수위', name: '시수 500톤, 정수 390톤, 소방 59톤, 고가수조' },
+                            { id: 'item_3_2', sub: '경고', name: '집수정 / 배수탱크 / 폐수조 / 우수조 / 태양열 / 정화조' },
+                            { id: 'item_3_3', sub: '저수위', name: '지하시수, 저수조 / 고가수조 / RO수 / 급탕탱크' },
+                            { id: 'item_3_4', sub: '저수위', name: '경유 기름탱크 (20,000 ℓ)' },
+                            { id: 'item_3_5', sub: '저압력', name: '기수분리기 (팽창탱크)' },
+                            { id: 'item_3_6', sub: '고장', name: '보일러 / 냉동기 / 열교환기 / 냉각탑 / DDC판넬' },
+                            { id: 'item_3_7', sub: '매연', name: '연도누기' }
+                        ]
+                    },
+                    {
+                        id: 'cat_comm', title: '4. 통신', icon: 'fa-network-wired text-indigo-500',
+                        items: [
+                            { id: 'item_4_1', sub: '통신', name: '통신 상태 (기계실, 전기실, 방재실, 보안실 등)' }
+                        ]
+                    }
+                ]
+            },
+            ro: {
+                title: "RO실 일일점검 일지",
+                categories: [
+                    {
+                        id: 'ro_cat_1', title: 'RO실 점검 항목', icon: 'fa-droplet text-cyan-500',
+                        items: [
+                            { id: 'ro_item_1', sub: '여과장치', name: '전처리 정밀 여과장치 누수 및 배관 개폐 확인' },
+                            { id: 'ro_item_2', sub: '활성탄', name: '전처리 활성탄 여과장치 누수 및 배관 개폐 확인' },
+                            { id: 'ro_item_3', sub: '고압펌프', name: '고압 펌프 누수 및 이상고온 체크' },
+                            { id: 'ro_item_4', sub: '역삼투압', name: '역삼투압 장치 누수 및 배관 개폐 확인' },
+                            { id: 'ro_item_5', sub: '저장조', name: 'RO수 저장조 압력 및 누수 체크' },
+                            { id: 'ro_item_6', sub: '순환펌프', name: 'RO수 공급 및 순환펌프 누수 확인' },
+                            { id: 'ro_item_7', sub: '온수저장조', name: 'RO 온수 저장조 누수 및 급수밸브 확인' },
+                            { id: 'ro_item_8', sub: '온수펌프', name: 'RO 온수공급 및 순환펌프 고온 체크' },
+                            { id: 'ro_item_9', sub: '정밀여과', name: '정밀 여과장치 누수 및 배관 개폐 확인' },
+                            { id: 'ro_item_10', sub: '환경정리', name: 'RO실내 정리정돈 상태' }
+                        ]
+                    }
+                ]
+            },
+            solar: {
+                title: "신재생에너지 (태양열) 일일 점검일지",
+                categories: [
+                    {
+                        id: 'solar_cat_1', title: '태양열 점검 사항', icon: 'fa-sun text-amber-500',
+                        items: [
+                            { id: 'solar_item_1', sub: '계측기', name: '온도계 압력계상태 확인할것' },
+                            { id: 'solar_item_2', sub: '집열판', name: '집열판등 오염상태 확인할것' },
+                            { id: 'solar_item_3', sub: '보온재', name: '보온재 탈락 및 파손상태 확인할것' },
+                            { id: 'solar_item_4', sub: '순환펌프', name: '순환펌프 누수상태 점검할것' },
+                            { id: 'solar_item_5', sub: '제어시스템', name: '제어시스템 연동 작동상태 점검' },
+                            { id: 'solar_item_6', sub: '압력/유량', name: '입,출구 압력, 유량, 온도상태 확인' },
+                            { id: 'solar_item_7', sub: '생산량', name: '태양열 온수 적정온도 및 생산량 확인' },
+                            { id: 'solar_item_8', sub: '열교환', name: '지열 열교환 상태 점검 확인' },
+                            { id: 'solar_item_9', sub: '안전장치', name: '안전밸브, 에어벤트, 팽창탱크, 급수장치' },
+                            { id: 'solar_item_10', sub: '지중열', name: '개방형 지중열교환기 홀내부 오염상태' },
+                            { id: 'solar_item_11', sub: '인터록', name: '인터록 상태 점검 확인' }
+                        ]
+                    }
+                ]
+            }
+        };
+
+        let selectedLogType = 'central';
+        let currentLogs = {};
+        let managerSignature = null;
+        let adminName = '관리자';
+        let canvas, ctx, isDrawing = false;
+        let renderedMonitoringData = [];
+
+        const logTypeSelect = document.getElementById('logTypeSelect');
+        const headerTitle = document.getElementById('headerTitle');
+        const logDateInput = document.getElementById('logDate');
+        const inspectorNameInput = document.getElementById('inspectorName');
+        const checklistContainer = document.getElementById('checklistContainer');
+        const generalMemoInput = document.getElementById('generalMemo');
+        const approvalStatusTag = document.getElementById('approvalStatusTag');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const today = new Date().toISOString().split('T')[0];
+            logDateInput.value = today;
+            document.getElementById('monthlyFilterMonth').value = today.slice(0, 7);
+
+            initSignatureCanvas();
+            renderChecklists();
+            loadLogData(today, selectedLogType);
+            setupEventListeners();
+        });
+
+        function initSignatureCanvas() {
+            canvas = document.getElementById('signatureCanvas');
+            ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width || 320;
+            canvas.height = rect.height || 128;
+            ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.strokeStyle = '#0f172a';
+
+            function getPos(e) {
+                const cRect = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return { x: clientX - cRect.left, y: clientY - cRect.top };
+            }
+            function start(e) { isDrawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); }
+            function move(e) { if (!isDrawing) return; e.preventDefault(); const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); }
+            function end() { isDrawing = false; }
+
+            canvas.addEventListener('mousedown', start); canvas.addEventListener('mousemove', move); window.addEventListener('mouseup', end);
+            canvas.addEventListener('touchstart', start, { passive: false }); canvas.addEventListener('touchmove', move, { passive: false }); canvas.addEventListener('touchend', end);
+        }
+
+        function renderChecklists() {
+            checklistContainer.innerHTML = '';
+            const t = logDataTemplates[selectedLogType];
+            headerTitle.textContent = t.title;
+
+            t.categories.forEach(cat => {
+                const card = document.createElement('div');
+                card.className = 'bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden';
+
+                let itemsHtml = '';
+                cat.items.forEach(item => {
+                    itemsHtml += `
+                        <div class="p-3 bg-slate-50/50 hover:bg-slate-50 transition border-t border-slate-100 flex flex-col gap-2.5" id="card_${item.id}">
+                            <div class="flex items-start space-x-2.5">
+                                <input type="checkbox" id="chk_${item.id}" data-item="${item.id}" class="item-checkbox mt-1 w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500 cursor-pointer flex-shrink-0">
+                                <div>
+                                    <span class="inline-block px-1.5 py-0.5 text-[10px] font-bold bg-slate-200 text-slate-700 rounded mr-1">${item.sub}</span>
+                                    <label for="chk_${item.id}" class="text-xs sm:text-sm font-medium text-slate-800 cursor-pointer select-none leading-snug">
+                                        ${item.name}
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="flex items-center justify-end pl-7">
+                                <div class="inline-flex rounded-xl p-0.5 bg-slate-200 text-xs font-medium w-full sm:w-auto">
+                                    <button type="button" data-item="${item.id}" data-status="pass" class="status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-slate-600 transition">양호</button>
+                                    <button type="button" data-item="${item.id}" data-status="warn" class="status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-slate-600 transition">점검요함</button>
+                                    <button type="button" data-item="${item.id}" data-status="fail" class="status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-slate-600 transition">불량</button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                card.innerHTML = `
+                    <div class="bg-slate-100/80 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between">
+                        <div class="flex items-center space-x-2 font-bold text-slate-800 text-xs sm:text-sm">
+                            <i class="fa-solid ${cat.icon}"></i>
+                            <span>${cat.title}</span>
+                        </div>
+                        <button type="button" onclick="batchCategoryCheck('${cat.id}', true)" class="text-[11px] text-blue-600 hover:text-blue-800 font-semibold">그룹 양호</button>
+                    </div>
+                    <div>${itemsHtml}</div>
+                `;
+                checklistContainer.appendChild(card);
+            });
+        }
+
+        window.batchCategoryCheck = function(catId, status) {
+            const t = logDataTemplates[selectedLogType];
+            const cat = t.categories.find(c => c.id === catId);
+            if (cat) {
+                cat.items.forEach(item => {
+                    if (!currentLogs[item.id]) currentLogs[item.id] = {};
+                    currentLogs[item.id].checked = status;
+                    currentLogs[item.id].status = status ? 'pass' : null;
+                    updateItemUI(item.id);
+                });
+                triggerAutoSave();
+            }
+        };
+
+        function setAllItemsStatus(checkedStatus, defaultStatus) {
+            const t = logDataTemplates[selectedLogType];
+            t.categories.forEach(cat => {
+                cat.items.forEach(item => {
+                    if (!currentLogs[item.id]) currentLogs[item.id] = {};
+                    currentLogs[item.id].checked = checkedStatus;
+                    currentLogs[item.id].status = defaultStatus;
+                    updateItemUI(item.id);
+                });
+            });
+            triggerAutoSave();
+            showToast(checkedStatus ? '전체 항목이 양호 처리되었습니다.' : '전체 선택이 해제되었습니다.', 'info');
+        }
+
+        function updateItemUI(itemId) {
+            const chk = document.getElementById(`chk_${itemId}`);
+            const card = document.getElementById(`card_${itemId}`);
+            if (!chk || !card) return;
+
+            const data = currentLogs[itemId] || { checked: false, status: null };
+            chk.checked = !!data.checked;
+
+            card.querySelectorAll('.status-btn').forEach(btn => {
+                const s = btn.dataset.status;
+                if (data.checked && data.status === s) {
+                    if (s === 'pass') btn.className = 'status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-emerald-600 text-white font-bold shadow';
+                    else if (s === 'warn') btn.className = 'status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-amber-500 text-white font-bold shadow';
+                    else if (s === 'fail') btn.className = 'status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg bg-red-600 text-white font-bold shadow';
+                } else {
+                    btn.className = 'status-btn flex-1 sm:flex-none px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition';
+                }
+            });
+        }
+
+        function triggerAutoSave() {
+            document.getElementById('autoSaveText').textContent = '자동 저장 중...';
+            saveLogData(false);
+        }
+
+        function getExistingApprovalInMonth(targetDateStr) {
+            const targetMonthStr = targetDateStr.slice(0, 7); 
+            const [y, m] = targetMonthStr.split('-').map(Number);
+            const lastDay = new Date(y, m, 0).getDate();
+
+            for (let d = 1; d <= lastDay; d++) {
+                const dateStr = `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                if (dateStr === targetDateStr) continue;
+
+                for (let type of ['central', 'ro', 'solar']) {
+                    const raw = localStorage.getItem(`log_${type}_${dateStr}`);
+                    if (raw) {
+                        try {
+                            const parsed = JSON.parse(raw);
+                            if (parsed.signature) {
+                                return { date: dateStr, typeTitle: logDataTemplates[type].title };
+                            }
+                        } catch(e) {}
+                    }
+                }
+            }
+            return null;
+        }
+
+        function setupEventListeners() {
+            logTypeSelect.addEventListener('change', (e) => {
+                selectedLogType = e.target.value;
+                renderChecklists();
+                loadLogData(logDateInput.value, selectedLogType);
+            });
+
+            const monthlyModal = document.getElementById('monthlyReportModal');
+            document.getElementById('monthlyReportModalBtn').addEventListener('click', () => { renderMonthlyTable(); monthlyModal.classList.remove('hidden'); });
+            document.getElementById('closeMonthlyReportBtn').addEventListener('click', () => monthlyModal.classList.add('hidden'));
+            document.getElementById('closeMonthlyReportFooter').addEventListener('click', () => monthlyModal.classList.add('hidden'));
+            document.getElementById('printMonthlyReportBtn').addEventListener('click', () => window.print());
+            document.getElementById('exportExcelBtn').addEventListener('click', downloadMonitoringExcel);
+
+            document.getElementById('monthlyFilterMonth').addEventListener('change', () => {
+                document.getElementById('dailyFilterDate').value = '';
+                renderMonthlyTable();
+            });
+            document.getElementById('dailyFilterDate').addEventListener('change', () => renderMonthlyTable());
+            document.getElementById('resetDateFilterBtn').addEventListener('click', () => {
+                document.getElementById('dailyFilterDate').value = '';
+                renderMonthlyTable();
+            });
+
+            const sigModal = document.getElementById('signatureModal');
+            const authModal = document.getElementById('adminAuthModal');
+            const changePwdModal = document.getElementById('changePwdModal');
+            const adminPasswordInput = document.getElementById('adminPasswordInput');
+
+            document.getElementById('adminSignatureModalBtn').addEventListener('click', () => {
+                adminPasswordInput.value = '';
+                authModal.classList.remove('hidden');
+                adminPasswordInput.focus();
+            });
+
+            document.getElementById('confirmAuthBtn').addEventListener('click', () => {
+                if (adminPasswordInput.value === getAdminPassword()) {
+                    authModal.classList.add('hidden');
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    document.getElementById('sigModalDateTitle').textContent = `[${logDateInput.value}] 관리자 결재 승인`;
+                    sigModal.classList.remove('hidden');
+                } else {
+                    showToast('비밀번호가 일치하지 않습니다.', 'warn');
+                    adminPasswordInput.value = '';
+                    adminPasswordInput.focus();
+                }
+            });
+
+            const openChangePwd = () => {
+                authModal.classList.add('hidden');
+                monthlyModal.classList.add('hidden');
+                document.getElementById('currentPwdInput').value = '';
+                document.getElementById('newPwdInput').value = '';
+                document.getElementById('newPwdConfirmInput').value = '';
+                changePwdModal.classList.remove('hidden');
+            };
+            document.getElementById('authToChangePwdBtn').addEventListener('click', openChangePwd);
+            document.getElementById('openChangePwdModalBtn').addEventListener('click', openChangePwd);
+
+            document.getElementById('saveNewPwdBtn').addEventListener('click', () => {
+                const cur = document.getElementById('currentPwdInput').value;
+                const nxt = document.getElementById('newPwdInput').value;
+                const nxtConfirm = document.getElementById('newPwdConfirmInput').value;
+
+                if (cur !== getAdminPassword()) {
+                    showToast('현재 비밀번호가 일치하지 않습니다.', 'warn');
+                    return;
+                }
+                if (!nxt || nxt.length < 2) {
+                    showToast('새 비밀번호를 올바르게 입력해주세요.', 'warn');
+                    return;
+                }
+                if (nxt !== nxtConfirm) {
+                    showToast('새 비밀번호가 서로 일치하지 않습니다.', 'warn');
+                    return;
+                }
+
+                setAdminPassword(nxt);
+                changePwdModal.classList.add('hidden');
+                showToast('관리자 비밀번호가 변경되었습니다.', 'success');
+            });
+
+            document.getElementById('closeAuthModalBtn').addEventListener('click', () => authModal.classList.add('hidden'));
+            document.getElementById('cancelAuthBtn').addEventListener('click', () => authModal.classList.add('hidden'));
+            document.getElementById('closeChangePwdModalBtn').addEventListener('click', () => changePwdModal.classList.add('hidden'));
+            document.getElementById('cancelChangePwdBtn').addEventListener('click', () => changePwdModal.classList.add('hidden'));
+            document.getElementById('closeSigModalBtn').addEventListener('click', () => sigModal.classList.add('hidden'));
+            document.getElementById('cancelSigBtn').addEventListener('click', () => sigModal.classList.add('hidden'));
+
+            document.getElementById('saveSignatureBtn').addEventListener('click', () => {
+                const targetDate = logDateInput.value;
+                const existingApproval = getExistingApprovalInMonth(targetDate);
+
+                if (existingApproval) {
+                    showToast(`한 달에 1회만 결재 가능합니다. ([${existingApproval.date}] 이미 결재됨)`, 'warn');
+                    return;
+                }
+
+                managerSignature = canvas.toDataURL();
+                adminName = document.getElementById('adminNameInput').value || '관리자';
+                sigModal.classList.add('hidden');
+                updateApprovalBadge(true);
+                saveLogData(true);
+            });
+
+            checklistContainer.addEventListener('change', (e) => {
+                if (e.target.classList.contains('item-checkbox')) {
+                    const itemId = e.target.dataset.item;
+                    if (!currentLogs[itemId]) currentLogs[itemId] = { status: 'pass' };
+                    currentLogs[itemId].checked = e.target.checked;
+                    updateItemUI(itemId);
+                    triggerAutoSave();
+                }
+            });
+
+            checklistContainer.addEventListener('click', (e) => {
+                const btn = e.target.closest('.status-btn');
+                if (btn) {
+                    const itemId = btn.dataset.item;
+                    const status = btn.dataset.status;
+                    if (!currentLogs[itemId]) currentLogs[itemId] = {};
+                    currentLogs[itemId].status = status;
+                    currentLogs[itemId].checked = true;
+                    updateItemUI(itemId);
+                    triggerAutoSave();
+                }
+            });
+
+            logDateInput.addEventListener('change', () => {
+                loadLogData(logDateInput.value, selectedLogType);
+            });
+
+            [inspectorNameInput, generalMemoInput].forEach(el => {
+                el.addEventListener('change', () => {
+                    triggerAutoSave();
+                });
+            });
+
+            document.getElementById('batchPassBtn').addEventListener('click', () => setAllItemsStatus(true, 'pass'));
+            document.getElementById('batchResetBtn').addEventListener('click', () => setAllItemsStatus(false, null));
+            document.getElementById('saveCompleteBtn').addEventListener('click', () => saveLogData(true));
+        }
+
+        function updateApprovalBadge(isApproved) {
+            if (isApproved) {
+                approvalStatusTag.className = "px-2.5 py-0.5 rounded font-bold bg-emerald-100 text-emerald-800 text-[11px]";
+                approvalStatusTag.textContent = `결재완료 (${adminName})`;
+            } else {
+                approvalStatusTag.className = "px-2.5 py-0.5 rounded font-semibold bg-slate-100 text-slate-600 text-[11px]";
+                approvalStatusTag.textContent = "결재 미완료";
+            }
+        }
+
+        function getFormattedItemDetails() {
+            const formatted = {};
+            const t = logDataTemplates[selectedLogType];
+            t.categories.forEach(cat => {
+                cat.items.forEach(item => {
+                    const log = currentLogs[item.id];
+                    let statusText = '미점검';
+                    if (log && log.checked) {
+                        if (log.status === 'pass') statusText = '양호';
+                        else if (log.status === 'warn') statusText = '점검요함';
+                        else if (log.status === 'fail') statusText = '불량';
+                    }
+                    formatted[item.name] = statusText;
+                });
+            });
+            return formatted;
+        }
+
+        function saveLogData(isManual = false) {
+            const dateKey = logDateInput.value;
+            if (!dateKey) return;
+
+            const payload = {
+                action: 'saveLog',
+                logType: selectedLogType,
+                logTitle: logDataTemplates[selectedLogType].title,
+                date: dateKey,
+                inspector: inspectorNameInput.value,
+                generalMemo: generalMemoInput.value,
+                items: currentLogs,
+                itemDetails: getFormattedItemDetails(),
+                signature: managerSignature,
+                adminName: adminName,
+                isApproved: !!managerSignature,
+                updatedAt: new Date().toLocaleString('ko-KR')
+            };
+
+            localStorage.setItem(`log_${selectedLogType}_${dateKey}`, JSON.stringify(payload));
+            document.getElementById('autoSaveText').textContent = '저장 완료됨';
+
+            if (isManual && APPS_SCRIPT_URL && APPS_SCRIPT_URL.startsWith('http')) {
+                const formData = new URLSearchParams();
+                formData.append('data', JSON.stringify(payload));
+
+                fetch(APPS_SCRIPT_URL, { 
+                    method: 'POST', 
+                    mode: 'no-cors', 
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, 
+                    body: formData.toString() 
+                })
+                .then(() => showToast('구글 스프레드시트에 성공적으로 전송되었습니다.', 'success'))
+                .catch(() => showToast('구글 시트 전송 실패 (로컬 저장은 완료됨)', 'warn'));
+            } else if (isManual) {
+                showToast('점검표가 로컬에 안전하게 저장되었습니다.', 'success');
+            }
+        }
+
+        function loadLogData(dateString, typeKey) {
+            const raw = localStorage.getItem(`log_${typeKey}_${dateString}`);
+            currentLogs = {}; managerSignature = null;
+
+            if (raw) {
+                try {
+                    const data = JSON.parse(raw);
+                    inspectorNameInput.value = data.inspector || '';
+                    generalMemoInput.value = data.generalMemo || '';
+                    currentLogs = data.items || {};
+                    managerSignature = data.signature || null;
+                    adminName = data.adminName || '관리자';
+                    updateApprovalBadge(!!managerSignature);
+                } catch(e) {}
+            } else {
+                inspectorNameInput.value = '';
+                generalMemoInput.value = '';
+                updateApprovalBadge(false);
+            }
+
+            logDataTemplates[typeKey].categories.forEach(cat => {
+                cat.items.forEach(item => updateItemUI(item.id));
+            });
+        }
+
+        function renderMonthlyTable() {
+            const tbody = document.getElementById('monthlyTableBody');
+            tbody.innerHTML = '';
+            renderedMonitoringData = [];
+
+            const targetMonth = document.getElementById('monthlyFilterMonth').value;
+            const targetDaily = document.getElementById('dailyFilterDate').value;
+            if (!targetMonth && !targetDaily) return;
+
+            let datesToSearch = [];
+
+            if (targetDaily) {
+                datesToSearch.push(targetDaily);
+                document.getElementById('printReportTitle').textContent = `${targetDaily} 일일 시설물 점검 현황보고서`;
+            } else {
+                const [y, m] = targetMonth.split('-').map(Number);
+                const lastDay = new Date(y, m, 0).getDate();
+                for (let d = 1; d <= lastDay; d++) {
+                    datesToSearch.push(`${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`);
+                }
+                document.getElementById('printReportTitle').textContent = `${targetMonth} 월간 시설물 점검 현황보고서`;
+            }
+
+            datesToSearch.forEach(dateStr => {
+                ['central', 'ro', 'solar'].forEach(type => {
+                    const raw = localStorage.getItem(`log_${type}_${dateStr}`);
+                    if (raw) {
+                        const data = JSON.parse(raw);
+                        renderedMonitoringData.push(data);
+
+                        const tr = document.createElement('tr');
+                        tr.className = 'hover:bg-slate-50 border-b border-slate-100';
+                        tr.innerHTML = `
+                            <td class="p-2.5 font-bold text-slate-800">${dateStr}</td>
+                            <td class="p-2.5 text-slate-700">${logDataTemplates[type].title}</td>
+                            <td class="p-2.5">${data.inspector}</td>
+                            <td class="p-2.5 text-center"><span class="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded font-bold text-[10px]">작성완료</span></td>
+                            <td class="p-2.5 text-center">${data.signature ? `<span class="text-emerald-600 font-bold">결재완료 (${data.adminName || '관리자'})</span>` : '<span class="text-slate-400">미결재</span>'}</td>
+                            <td class="p-2.5 text-center no-print"><button onclick="loadRecordToMain('${type}', '${dateStr}')" class="bg-blue-600 text-white text-[10px] px-2 py-1 rounded">열기</button></td>
+                        `;
+                        tbody.appendChild(tr);
+                    }
+                });
+            });
+
+            if (tbody.children.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="6" class="text-center py-6 text-slate-400">선택된 일자/월의 점검 내역이 없습니다.</td></tr>`;
+            }
+        }
+
+        function downloadMonitoringExcel() {
+            if (!renderedMonitoringData || renderedMonitoringData.length === 0) {
+                showToast('엑셀로 내보낼 데이터가 없습니다.', 'warn');
+                return;
+            }
+
+            let csvContent = "\uFEFF";
+            csvContent += "점검일자,점검표종류,점검자,결재상태,결재자,특이사항,최종수정시간\n";
+
+            renderedMonitoringData.forEach(item => {
+                const memo = (item.generalMemo || '').replace(/"/g, '""');
+                const line = [
+                    `"${item.date}"`,
+                    `"${item.logTitle}"`,
+                    `"${item.inspector}"`,
+                    `"${item.signature ? '결재완료' : '미결재'}"`,
+                    `"${item.adminName || ''}"`,
+                    `"${memo}"`,
+                    `"${item.updatedAt || ''}"`
+                ].join(",");
+                csvContent += line + "\n";
+            });
+
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `시설물점검모니터링_${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
+            showToast('엑셀(CSV) 파일이 다운로드되었습니다.', 'success');
+        }
+
+        window.loadRecordToMain = function(type, date) {
+            selectedLogType = type; logTypeSelect.value = type; logDateInput.value = date;
+            renderChecklists(); loadLogData(date, type);
+            document.getElementById('monthlyReportModal').classList.add('hidden');
+        };
+
+        function showToast(msg, type='success') {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMessage').textContent = msg;
+            toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-full shadow-xl flex items-center space-x-2 transition-all duration-300 opacity-100 translate-y-0`;
+            setTimeout(() => { toast.className = `fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs px-4 py-2.5 rounded-full shadow-xl flex items-center space-x-2 transition-all duration-300 opacity-0 pointer-events-none translate-y-4`; }, 2300);
+        }
+    </script>
+</body>
+</html>
